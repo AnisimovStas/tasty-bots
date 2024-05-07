@@ -59,7 +59,8 @@ func cmdNew(input string, storage tastybot.Storage) {
 
 	fmt.Println("Creating a new bot with token: " + token)
 	bot := tastybot.New(token, name, storage)
-	bot.Run()
+	//bot.Run()
+	bot.RunTechies()
 }
 
 func cmdStatus(input string, storage tastybot.Storage) {
