@@ -1,33 +1,50 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
-	"fmt"
+	"log"
+	"tasty-bots/internal/storage/sqlite"
+	"tasty-bots/internal/tastybot"
 
 	"github.com/spf13/cobra"
 )
 
+var all bool
+var id int
+
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "check status of the bot",
+	Long:  `check status of the bot. For example: tasty-bots status -n=<bot name> or tasty-bots status -all`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("status called")
+
+		s, err := sqlite.New("data/sqlite/db.db")
+		if err != nil {
+			log.Fatalf("can't connect to db %w", err)
+		}
+		if !all && id == 0 {
+			log.Fatalf("please provide bot id to get status")
+
+		}
+
+		if all {
+			tastybot.StatusAll(s)
+			return
+		}
+
+		bot, err := tastybot.FindBotById(id, s)
+		if err != nil {
+			log.Fatalf("can't find bot with id %v", id)
+		}
+		bot.GetStatus()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
 
+	statusCmd.Flags().IntVarP(&id, "id", "i", 0, "id of the bot")
+	statusCmd.Flags().BoolVarP(&all, "all", "a", false, "check all bots")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
@@ -37,4 +54,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }

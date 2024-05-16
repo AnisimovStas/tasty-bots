@@ -1,24 +1,33 @@
 package tastybot
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/joho/godotenv"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+
 	"time"
+
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/proto"
+	"github.com/joho/godotenv"
 )
 
-type User struct {
-	Name       string
-	Status     string // READY | RUNNING | STOPPED BY
+type Bot struct {
+	Id         int
 	TastyToken string
-	CasesCount int64
+	BaseUrl    string // prod or dev stands
+	Status     string // waiting | case open | techies | stoped by error
+	CasesCount int    //Amount of opened cases
+}
+
+type Storage interface {
+	Add(ctx context.Context, bot *Bot) (int, error)
+	PickById(ctx context.Context, id int) (*Bot, error)
+	PickAll(ctx context.Context) ([]Bot, error)
 }
 
 type OpenCaseResBody struct {
@@ -28,19 +37,25 @@ type OpenCaseResBody struct {
 	}
 }
 
-type Storage interface {
-	Add(bot *User)
-	GetByField(field string) (*User, bool)
-	GetAll() []*User
+func New(tastyToken, baseUrl string, stg Storage) error {
+	newBot := &Bot{TastyToken: tastyToken, Status: "READY", BaseUrl: baseUrl}
+	id, err := stg.Add(context.Background(), newBot)
+	if err != nil {
+		return fmt.Errorf("error during adding bot %w", err)
+	}
+	fmt.Printf("Created bot with id %v \n", id)
+	return nil
 }
 
-func New(tastyToken, name string, stg Storage) *User {
-	newUser := &User{TastyToken: tastyToken, Status: "READY", Name: name}
-	stg.Add(newUser)
-	return newUser
+func FindBotById(id int, stg Storage) (*Bot, error) {
+	bot, err := stg.PickById(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+	return bot, nil
 }
 
-func (u *User) openCase(baseURL, caseName string) {
+func (u *Bot) openCase(baseURL, caseName string) {
 	url := baseURL + "/api/v1/cases/" + caseName + "/open"
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -82,7 +97,7 @@ func (u *User) openCase(baseURL, caseName string) {
 	u.CasesCount++
 }
 
-func (u *User) Run() {
+func (u *Bot) Run() {
 	u.Status = "RUNNING"
 	err := godotenv.Load()
 	if err != nil {
@@ -120,7 +135,7 @@ func (u *User) Run() {
 	}
 }
 
-func (u *User) RunTechies() {
+func (u *Bot) RunTechies() {
 	u.Status = "RUNNING"
 	techiesCooldown := 3*time.Hour + 5*time.Minute
 	for {
@@ -130,18 +145,25 @@ func (u *User) RunTechies() {
 
 }
 
-func (u *User) GetStatus() {
-	fmt.Println("name: " + u.Name + " status: " + u.Status + " opened cases: " + strconv.FormatInt(u.CasesCount, 10))
+func (b *Bot) GetStatus() {
+	fmt.Printf("bot: <id: %v, baseURl: %v, status: %v> \n", b.Id, b.BaseUrl, b.Status)
 }
 
-func StatusAll(stg Storage) {
-	bots := stg.GetAll()
+func StatusAll(stg Storage) ([]Bot, error) {
+	bots, err := stg.PickAll(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("error during get status All %w", err)
+	}
+
 	for _, bot := range bots {
 		bot.GetStatus()
 	}
+
+	return bots, nil
+
 }
 
-func (u *User) PlayTechies() {
+func (u *Bot) PlayTechies() {
 	ttCookie := &proto.NetworkCookie{
 		Name:     "tastyToken",
 		Value:    u.TastyToken,
