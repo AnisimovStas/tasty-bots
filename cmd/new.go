@@ -16,19 +16,24 @@ const (
 var newCmd = &cobra.Command{
 	Use:   "new",
 	Short: "Command to create new bot",
-	Long:  `Command to create new bot For example: tasty-bots new -t=<tasty token>`,
+	Long:  `Command to create new bot For example: tasty-bots new -t=<tasty token> -u=<baseUrl>`,
 	Run: func(cmd *cobra.Command, args []string) {
 		t := cmd.Flag("token").Value.String()
 		u := cmd.Flag("url").Value.String()
 		if u == "" {
 			u = DEFAULT_URL
 		}
+		if t == "" {
+			log.Fatalf("please provide tastyToken")
+		}
+
 		s, err := sqlite.New("data/sqlite/db.db")
 		if err != nil {
 			log.Fatalf("can't connect to db %w", err)
 		}
 
 		tastybot.New(t, u, s)
+
 	},
 }
 

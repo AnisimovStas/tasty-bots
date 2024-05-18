@@ -1,14 +1,17 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
-	"fmt"
+	"log"
+	"tasty-bots/internal/storage/sqlite"
+	"tasty-bots/internal/tastybot"
 
 	"github.com/spf13/cobra"
 )
+
+var caseTD string
 
 // runCasesCmd represents the runCases command
 var runCasesCmd = &cobra.Command{
@@ -21,12 +24,24 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("runCases called")
+		s, err := sqlite.New("data/sqlite/db.db")
+		if err != nil {
+			log.Fatalf("can't connect to db %w", err)
+		}
+
+		err = tastybot.RunCases(id, caseTD, s)
+		if err != nil {
+			log.Fatalf("error on set status %w", err)
+
+		}
+
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(runCasesCmd)
+	runCasesCmd.Flags().IntVarP(&id, "id", "i", 0, "id of the bot")
+	runCasesCmd.Flags().StringVarP(&caseTD, "case", "c", "v2_rare", "id of the bot")
 
 	// Here you will define your flags and configuration settings.
 

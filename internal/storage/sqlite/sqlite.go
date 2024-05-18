@@ -87,6 +87,37 @@ func (s *Storage) PickAll(ctx context.Context) ([]tastybot.Bot, error) {
 	return bots, nil
 }
 
+// ChangeStatusById select bot by id and change status
+func (s *Storage) ChangeStatusById(ctx context.Context, id int, status string) error {
+	q := /*sql */ `UPDATE bots SET status = ? WHERE id = ?`
+	r, err := s.db.ExecContext(ctx, q, status, id)
+	if err != nil {
+		return fmt.Errorf("error during changing status for bot id: %v,  %w", id, err)
+	}
+	count, _ := r.RowsAffected()
+
+	if count == 0 {
+		return fmt.Errorf("error during changing status for bot id: %v,  %w", id, "can't find bot with that id")
+	}
+
+	return nil
+}
+
+func (s *Storage) IncreaseCaseCountById(ctx context.Context, id int) error {
+	q := /*sql */ `UPDATE bots SET casesCount = (SELECT casesCount FROM bots WHERE id = ?)+1 WHERE id = ?`
+	r, err := s.db.ExecContext(ctx, q, id, id)
+	if err != nil {
+		return fmt.Errorf("error during changing status for bot id: %v,  %w", id, err)
+	}
+	count, _ := r.RowsAffected()
+
+	if count == 0 {
+		return fmt.Errorf("error during changing status for bot id: %v,  %w", id, "can't find bot with that id")
+	}
+
+	return nil
+}
+
 func (s *Storage) Init(ctx context.Context) error {
 	q := "CREATE TABLE IF NOT EXISTS bots (id INTEGER PRIMARY KEY, tastyToken TEXT, baseUrl TEXT, status TEXT, casesCount INTEGER)"
 

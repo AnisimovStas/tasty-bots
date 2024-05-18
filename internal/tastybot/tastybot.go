@@ -5,15 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
 
 	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
-	"github.com/joho/godotenv"
 )
 
 type Bot struct {
@@ -28,6 +25,8 @@ type Storage interface {
 	Add(ctx context.Context, bot *Bot) (int, error)
 	PickById(ctx context.Context, id int) (*Bot, error)
 	PickAll(ctx context.Context) ([]Bot, error)
+	ChangeStatusById(ctx context.Context, id int, s string) error
+	IncreaseCaseCountById(ctx context.Context, id int) error
 }
 
 type OpenCaseResBody struct {
@@ -55,14 +54,14 @@ func FindBotById(id int, stg Storage) (*Bot, error) {
 	return bot, nil
 }
 
-func (u *Bot) openCase(baseURL, caseName string) {
-	url := baseURL + "/api/v1/cases/" + caseName + "/open"
+func (bot *Bot) openCase(caseName string) string {
+	url := bot.BaseUrl + "/api/v1/cases/" + caseName + "/open"
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
-	req.Header.Add("Authorization", "Bearer "+u.TastyToken)
+	req.Header.Add("Authorization", "Bearer "+bot.TastyToken)
 	req.Header.Add("Content-Type", "application/json")
 
 	client := &http.Client{}
@@ -85,54 +84,51 @@ func (u *Bot) openCase(baseURL, caseName string) {
 	if !resBody.Status {
 		switch resBody.Data.Code {
 		case "authentication_exception":
-			u.Status = "STOPPED BY: authentication_exception"
+			return "STOPPED BY: authentication_exception"
 		case "not_enough_balance":
-			u.Status = "STOPPED BY: not_enough_balance"
+			return "STOPPED BY: not_enough_balance"
 		case "unpredicted_exception":
-			u.Status = "STOPPED BY: unpredicted_exception"
+			return "STOPPED BY: unpredicted_exception"
 		}
-		return
 	}
 
-	u.CasesCount++
+	fmt.Printf("bot: %v openned case %v at %v \n", bot.Id, caseName, time.Now().Format(time.ANSIC))
+	return "ok"
 }
 
-func (u *Bot) Run() {
-	u.Status = "RUNNING"
-	err := godotenv.Load()
+func RunCases(id int, caseName string, stg Storage) error {
+	if id == 0 {
+		return fmt.Errorf("please provide bot id")
+	}
+	status := "WORKING CASE OPPENING"
+
+	err := stg.ChangeStatusById(context.Background(), id, status)
 	if err != nil {
-		log.Fatalf("err loading: %v", err)
+		return err
 	}
-
-	baseURL := os.Getenv("BASE_URL")
-	openCase := os.Getenv("CASE")
-	timer := os.Getenv("TIMER")
-
-	if baseURL == "" {
-		baseURL = "https://dota2.radiant.dev.tastyteam.cc"
-		fmt.Println("You doest set BASE_URL env variable. Using default value: " + baseURL)
-	}
-
-	if openCase == "" {
-		openCase = "spring24_warm-inv"
-		fmt.Println("You doest set CASE env variable. Using default value: " + openCase)
-	}
-
-	if timer == "" {
-		timer = "10s"
-		fmt.Println("You doest set TIMER env variable. Using default value: " + timer)
-	}
-	timerDuration, err := time.ParseDuration(timer)
+	bot, err := stg.PickById(context.Background(), id)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
+
+	//case open cooldown
+	timer, _ := time.ParseDuration("10s")
 
 	for {
-		if u.Status == "RUNNING" {
-			u.openCase(baseURL, openCase)
-			time.Sleep(timerDuration)
+		if bot.Status == "WORKING CASE OPPENING" {
+			openStatus := bot.openCase(caseName)
+
+			if openStatus == "ok" {
+				stg.IncreaseCaseCountById(context.Background(), bot.Id)
+			} else {
+				return fmt.Errorf("bot status: %v", openStatus)
+			}
+			time.Sleep(timer)
 		}
 	}
+
+	return nil
+
 }
 
 func (u *Bot) RunTechies() {
