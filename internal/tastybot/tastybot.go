@@ -114,21 +114,22 @@ func RunCases(id int, caseName string, stg Storage) error {
 	//case open cooldown
 	timer, _ := time.ParseDuration("10s")
 
+	var openStatus string
 	for {
 		if bot.Status == "WORKING CASE OPPENING" {
-			openStatus := bot.openCase(caseName)
+			openStatus = bot.openCase(caseName)
 
 			if openStatus == "ok" {
 				stg.IncreaseCaseCountById(context.Background(), bot.Id)
 			} else {
 				return fmt.Errorf("bot status: %v", openStatus)
+				break
 			}
 			time.Sleep(timer)
 		}
 	}
 
-	return nil
-
+	return fmt.Errorf("bot status: %v", openStatus)
 }
 
 func (u *Bot) RunTechies() {
