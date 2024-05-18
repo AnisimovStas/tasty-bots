@@ -122,7 +122,6 @@ func RunCases(id int, caseName string, stg Storage) error {
 			if openStatus == "ok" {
 				stg.IncreaseCaseCountById(context.Background(), bot.Id)
 			} else {
-				return fmt.Errorf("bot status: %v", openStatus)
 				break
 			}
 			time.Sleep(timer)
